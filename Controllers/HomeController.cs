@@ -19,19 +19,6 @@ using Newtonsoft.Json;
 
 namespace pbiApp.Controllers
 {
-    public class AAD
-    {
-        public string token_type { get; set; }
-        public string scope { get; set; }
-        public string expires_in { get; set; }
-        public string ext_expires_in { get; set; }
-        public string expires_on { get; set; }
-        public string not_before { get; set; }
-        public string resource { get; set; }
-        public string access_token { get; set; }
-        public string refresh_token { get; set; }
-    }
-
     public class HomeController : Controller
     {
         private IConfiguration _configuration;
@@ -59,31 +46,11 @@ namespace pbiApp.Controllers
             GroupId = _configuration["PowerBI:GroupId"];
             ReportId = _configuration["PowerBI:ReportId"];
         }
-
-        public async Task<IActionResult> Index()
-        {
-            Username = config.GetSection("pbiUsername").Value;
-            Password = config.GetSection("pbiPassword").Value;
-            AuthorityUrl = config.GetSection("authorityUrl").Value;
-            ResourceUrl = config.GetSection("resourceUrl").Value;
-            ClientId = config.GetSection("clientId").Value;
-            ApiUrl = config.GetSection("apiUrl").Value;
-            GroupId = config.GetSection("groupId").Value;
-            ReportId = config.GetSection("reportId").Value;
-        }
-
         public async Task<IActionResult> Index()
         {
             // TODO: add this dynamically from user logged in
             String username = null;
             String roles = null;
-
-            var builder = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddJsonFile("appsettings.json");
-            Configuration = builder.Build();
-
-            populateCredentials(Configuration);
 
             var result = new EmbedConfig();
             try
@@ -114,9 +81,9 @@ namespace pbiApp.Controllers
                 var encodedContent = new FormUrlEncodedContent(content);
 
                 var authResponse = await httpClient.PostAsync(httpClient.BaseAddress, encodedContent);
-                var AAD = JsonConvert.DeserializeObject<AAD>(authResponse.Content.ReadAsStringAsync().Result);
+                var authObj = JsonConvert.DeserializeObject<AuthObject>(authResponse.Content.ReadAsStringAsync().Result);
 
-                var tokenCredentials = new TokenCredentials(AAD.access_token, "Bearer");
+                var tokenCredentials = new TokenCredentials(authObj.access_token, "Bearer");
 
                 // Create a Power BI Client object. It will be used to call Power BI APIs.
                 using (var client = new PowerBIClient(new Uri(ApiUrl), tokenCredentials))
