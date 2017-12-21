@@ -36,6 +36,8 @@ namespace pbiApp
             // Add application services.
             services.AddTransient<IEmailSender, EmailSender>();
 
+            services.AddSingleton<IConfiguration>(Configuration);
+
             services.AddMvc();
         }
 

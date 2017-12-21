@@ -18,19 +18,33 @@ namespace pbiApp.Controllers
     [Authorize]
     public class HomeController : Controller
     {
+        private IConfiguration _configuration;
+        
         // TODO: don't hardcode these, read from app settings value
-        private static readonly string Username = "admin@pbitestooyala.onmicrosoft.com";
-        private static readonly string Password = "Bravenewworld451";
-        private static readonly string AuthorityUrl = "https://login.windows.net/common/oauth2/authorize/";
-        private static readonly string ResourceUrl = "https://analysis.windows.net/powerbi/api";
-        private static readonly string ClientId = "5b383e0e-3b52-4a50-b53d-e435db41cf70";
-        private static readonly string ApiUrl = "https://api.powerbi.com/";
-        private static readonly string GroupId = "8c77797e-4f7c-4329-bb5d-ce0c040db2ca";
-        private static readonly string ReportId = "4e59755b-fa40-41ab-bfce-76f730c5fe46";
+        private readonly string Username;
+        private readonly string Password;
+        private readonly string AuthorityUrl;
+        private readonly string ResourceUrl;
+        private readonly string ClientId;
+        private readonly string ApiUrl;
+        private readonly string GroupId;
+        private readonly string ReportId;
 
-        public static string Username1 => Username;
+        public HomeController(IConfiguration config){
+            _configuration = config;
 
-        public async Task<IActionResult> Index(IConfiguration config)
+            // Setup Config values
+            Username = _configuration["PowerBI:Username"];
+            Password = _configuration["PowerBI:Password"];
+            AuthorityUrl = _configuration["PowerBI:AuthorityUrl"];
+            ResourceUrl = _configuration["PowerBI:ResourceUrl"];            
+            ClientId = _configuration["PowerBI:ClientId"];
+            ApiUrl = _configuration["PowerBI:ApiUrl"];
+            GroupId = _configuration["PowerBI:GroupId"];
+            ReportId = _configuration["PowerBI:ReportId"];
+        }
+
+        public async Task<IActionResult> Index()
         {
             // TODO: add this dynamically from user logged in
             String username = null;
