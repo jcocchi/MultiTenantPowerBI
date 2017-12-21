@@ -34,19 +34,33 @@ namespace pbiApp.Controllers
 
     public class HomeController : Controller
     {
-        private string Username = "";
-        private string Password = "";
-        private string AuthorityUrl = "";
-        private string ResourceUrl = "";
-        private string ClientId = "";
-        private string ApiUrl = "";
-        private string GroupId = "";
-        private string ReportId = "";
-        public static IConfigurationRoot Configuration { get; set; }
+        private IConfiguration _configuration;
+        
+        // TODO: don't hardcode these, read from app settings value
+        private readonly string Username;
+        private readonly string Password;
+        private readonly string AuthorityUrl;
+        private readonly string ResourceUrl;
+        private readonly string ClientId;
+        private readonly string ApiUrl;
+        private readonly string GroupId;
+        private readonly string ReportId;
 
-        //public string Username1 => Username;
+        public HomeController(IConfiguration config){
+            _configuration = config;
 
-        public void populateCredentials(IConfiguration config)
+            // Setup Config values
+            Username = _configuration["PowerBI:Username"];
+            Password = _configuration["PowerBI:Password"];
+            AuthorityUrl = _configuration["PowerBI:AuthorityUrl"];
+            ResourceUrl = _configuration["PowerBI:ResourceUrl"];            
+            ClientId = _configuration["PowerBI:ClientId"];
+            ApiUrl = _configuration["PowerBI:ApiUrl"];
+            GroupId = _configuration["PowerBI:GroupId"];
+            ReportId = _configuration["PowerBI:ReportId"];
+        }
+
+        public async Task<IActionResult> Index()
         {
             Username = config.GetSection("pbiUsername").Value;
             Password = config.GetSection("pbiPassword").Value;
