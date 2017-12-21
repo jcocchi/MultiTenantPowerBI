@@ -12,48 +12,97 @@ using Microsoft.PowerBI.Api.V2.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Clients.ActiveDirectory;
+using System.Security;
+using System.Net.Http;
+using System.IO;
+using Newtonsoft.Json;
 
 namespace pbiApp.Controllers
 {
-    [Authorize]
+    public class AAD
+    {
+        public string token_type { get; set; }
+        public string scope { get; set; }
+        public string expires_in { get; set; }
+        public string ext_expires_in { get; set; }
+        public string expires_on { get; set; }
+        public string not_before { get; set; }
+        public string resource { get; set; }
+        public string access_token { get; set; }
+        public string refresh_token { get; set; }
+    }
+
     public class HomeController : Controller
     {
-        // TODO: don't hardcode these, read from app settings value
-        private static readonly string Username = "admin@pbitestooyala.onmicrosoft.com";
-        private static readonly string Password = "Bravenewworld451";
-        private static readonly string AuthorityUrl = "https://login.windows.net/common/oauth2/authorize/";
-        private static readonly string ResourceUrl = "https://analysis.windows.net/powerbi/api";
-        private static readonly string ClientId = "5b383e0e-3b52-4a50-b53d-e435db41cf70";
-        private static readonly string ApiUrl = "https://api.powerbi.com/";
-        private static readonly string GroupId = "8c77797e-4f7c-4329-bb5d-ce0c040db2ca";
-        private static readonly string ReportId = "4e59755b-fa40-41ab-bfce-76f730c5fe46";
+        private string Username = "";
+        private string Password = "";
+        private string AuthorityUrl = "";
+        private string ResourceUrl = "";
+        private string ClientId = "";
+        private string ApiUrl = "";
+        private string GroupId = "";
+        private string ReportId = "";
+        public static IConfigurationRoot Configuration { get; set; }
 
-        public static string Username1 => Username;
+        //public string Username1 => Username;
 
-        public async Task<IActionResult> Index(IConfiguration config)
+        public void populateCredentials(IConfiguration config)
+        {
+            Username = config.GetSection("pbiUsername").Value;
+            Password = config.GetSection("pbiPassword").Value;
+            AuthorityUrl = config.GetSection("authorityUrl").Value;
+            ResourceUrl = config.GetSection("resourceUrl").Value;
+            ClientId = config.GetSection("clientId").Value;
+            ApiUrl = config.GetSection("apiUrl").Value;
+            GroupId = config.GetSection("groupId").Value;
+            ReportId = config.GetSection("reportId").Value;
+        }
+
+        public async Task<IActionResult> Index()
         {
             // TODO: add this dynamically from user logged in
             String username = null;
             String roles = null;
 
+            var builder = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json");
+            Configuration = builder.Build();
+
+            populateCredentials(Configuration);
+
             var result = new EmbedConfig();
             try
             {
                 result = new EmbedConfig();
-                // Create a user password cradentials.
-                var credential = new UserPasswordCredential(Username, Password);
 
-                // Authenticate using created credentials
-                var authenticationContext = new AuthenticationContext(AuthorityUrl);
-                var authenticationResult = await authenticationContext.AcquireTokenAsync(ResourceUrl, ClientId, credential);
+                //// Inspired from https://stackoverflow.com/questions/45480532/embed-power-bi-report-in-asp-net-core-website
 
-                if (authenticationResult == null)
+                var content = new Dictionary<string, string>();
+                content["grant_type"] = "password";
+                content["resource"] = ResourceUrl;
+                content["username"] = Username;
+                content["password"] = Password;
+                content["client_id"] = ClientId;
+                var httpClient = new HttpClient
                 {
-                    result.ErrorMessage = "Authentication Failed.";
-                    return View(result);
+                    Timeout = new TimeSpan(0, 5, 0),
+                    BaseAddress = new Uri(AuthorityUrl)
+                };
+
+                httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Content-Type: application/x-www-form-urlencoded", "application/json");
+
+                if (content == null)
+                {
+                    content = new Dictionary<string, string>();
                 }
 
-                var tokenCredentials = new TokenCredentials(authenticationResult.AccessToken, "Bearer");
+                var encodedContent = new FormUrlEncodedContent(content);
+
+                var authResponse = await httpClient.PostAsync(httpClient.BaseAddress, encodedContent);
+                var AAD = JsonConvert.DeserializeObject<AAD>(authResponse.Content.ReadAsStringAsync().Result);
+
+                var tokenCredentials = new TokenCredentials(AAD.access_token, "Bearer");
 
                 // Create a Power BI Client object. It will be used to call Power BI APIs.
                 using (var client = new PowerBIClient(new Uri(ApiUrl), tokenCredentials))
