@@ -22,7 +22,7 @@ namespace pbiApp.Controllers
     public class HomeController : Controller
     {
         private IConfiguration _configuration;
-        
+
         // TODO: don't hardcode these, read from app settings value
         private readonly string Username;
         private readonly string Password;
@@ -33,20 +33,26 @@ namespace pbiApp.Controllers
         private readonly string GroupId;
         private readonly string ReportId;
 
-        public HomeController(IConfiguration config){
+        public HomeController(IConfiguration config)
+        {
             _configuration = config;
 
             // Setup Config values
             Username = _configuration["PowerBI:Username"];
             Password = _configuration["PowerBI:Password"];
             AuthorityUrl = _configuration["PowerBI:AuthorityUrl"];
-            ResourceUrl = _configuration["PowerBI:ResourceUrl"];            
+            ResourceUrl = _configuration["PowerBI:ResourceUrl"];
             ClientId = _configuration["PowerBI:ClientId"];
             ApiUrl = _configuration["PowerBI:ApiUrl"];
             GroupId = _configuration["PowerBI:GroupId"];
             ReportId = _configuration["PowerBI:ReportId"];
         }
         public async Task<IActionResult> Index()
+        {
+            return View();
+        }
+
+        public async Task<IActionResult> EmbedReport()
         {
             // TODO: add this dynamically from user logged in
             String username = null;
