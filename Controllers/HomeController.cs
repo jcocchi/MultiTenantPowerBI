@@ -165,6 +165,87 @@ namespace pbiApp.Controllers
             return View(result);
         }
 
+        public async Task<ActionResult> EmbedDashboard()
+        {
+            var error = GetWebConfigErrors();
+            if (error != null)
+            {
+                return View(new EmbedConfig()
+                {
+                    ErrorMessage = error
+                });
+            }
+
+            // Create user credentials dictionary.
+            var content = new Dictionary<string, string>();
+            content["grant_type"] = "password";
+            content["resource"] = ResourceUrl;
+            content["username"] = Username;
+            content["password"] = Password;
+            content["client_id"] = ClientId;
+
+            var httpClient = new HttpClient
+            {
+                Timeout = new TimeSpan(0, 5, 0),
+                BaseAddress = new Uri(AuthorityUrl)
+            };
+
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Content-Type: application/x-www-form-urlencoded", "application/json");
+
+            if (content == null)
+            {
+                content = new Dictionary<string, string>();
+            }
+
+            var encodedContent = new FormUrlEncodedContent(content);
+
+            //Authenticate using credentials
+            var authResponse = await httpClient.PostAsync(httpClient.BaseAddress, encodedContent);
+            var authObj = JsonConvert.DeserializeObject<AuthObject>(authResponse.Content.ReadAsStringAsync().Result);
+
+            var tokenCredentials = new TokenCredentials(authObj.access_token, "Bearer");
+
+            // Create a Power BI Client object. It will be used to call Power BI APIs.
+            using (var client = new PowerBIClient(new Uri(ApiUrl), tokenCredentials))
+            {
+                // Get a list of dashboards.
+                var dashboards = await client.Dashboards.GetDashboardsInGroupAsync(GroupId);
+
+                // Get the first report in the group.
+                var dashboard = dashboards.Value.FirstOrDefault();
+
+                if (dashboard == null)
+                {
+                    return View(new EmbedConfig()
+                    {
+                        ErrorMessage = "Group has no dashboards."
+                    });
+                }
+
+                // Generate Embed Token.
+                var generateTokenRequestParameters = new GenerateTokenRequest(accessLevel: "view");
+                var tokenResponse = await client.Dashboards.GenerateTokenInGroupAsync(GroupId, dashboard.Id, generateTokenRequestParameters);
+
+                if (tokenResponse == null)
+                {
+                    return View(new EmbedConfig()
+                    {
+                        ErrorMessage = "Failed to generate embed token."
+                    });
+                }
+
+                // Generate Embed Configuration.
+                var embedConfig = new EmbedConfig()
+                {
+                    EmbedToken = tokenResponse,
+                    EmbedUrl = dashboard.EmbedUrl,
+                    Id = dashboard.Id
+                };
+
+                return View(embedConfig);
+            }
+        }
+
         public IActionResult About()
         {
             ViewData["Message"] = "Your application description page.";
@@ -182,6 +263,52 @@ namespace pbiApp.Controllers
         public IActionResult Error()
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+
+        /// <summary>
+        /// Check if web.config embed parameters have valid values.
+        /// </summary>
+        /// <returns>Null if web.config parameters are valid, otherwise returns specific error string.</returns>
+        private string GetWebConfigErrors()
+        {
+            // Client Id must have a value.
+            if (string.IsNullOrEmpty(ClientId))
+            {
+                return "ClientId is empty. please register your application as Native app in https://dev.powerbi.com/apps and fill client Id in web.config.";
+            }
+
+            // Client Id must be a Guid object.
+            Guid result;
+            if (!Guid.TryParse(ClientId, out result))
+            {
+                return "ClientId must be a Guid object. please register your application as Native app in https://dev.powerbi.com/apps and fill client Id in web.config.";
+            }
+
+            // Group Id must have a value.
+            if (string.IsNullOrEmpty(GroupId))
+            {
+                return "GroupId is empty. Please select a group you own and fill its Id in web.config";
+            }
+
+            // Group Id must be a Guid object.
+            if (!Guid.TryParse(GroupId, out result))
+            {
+                return "GroupId must be a Guid object. Please select a group you own and fill its Id in web.config";
+            }
+
+            // Username must have a value.
+            if (string.IsNullOrEmpty(Username))
+            {
+                return "Username is empty. Please fill Power BI username in web.config";
+            }
+
+            // Password must have a value.
+            if (string.IsNullOrEmpty(Password))
+            {
+                return "Password is empty. Please fill password of Power BI username in web.config";
+            }
+
+            return null;
         }
     }
 }
