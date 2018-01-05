@@ -87,6 +87,15 @@ namespace pbiApp.Controllers
                 var encodedContent = new FormUrlEncodedContent(content);
 
                 var authResponse = await httpClient.PostAsync(httpClient.BaseAddress, encodedContent);
+
+                if (authResponse == null)
+                {
+                    return View(new EmbedConfig()
+                    {
+                        ErrorMessage = "Authentication Failed."
+                    });
+                }
+
                 var authObj = JsonConvert.DeserializeObject<AuthObject>(authResponse.Content.ReadAsStringAsync().Result);
 
                 var tokenCredentials = new TokenCredentials(authObj.access_token, "Bearer");
@@ -201,6 +210,15 @@ namespace pbiApp.Controllers
 
             //Authenticate using credentials
             var authResponse = await httpClient.PostAsync(httpClient.BaseAddress, encodedContent);
+
+            if (authResponse == null)
+            {
+                return View(new EmbedConfig()
+                {
+                    ErrorMessage = "Authentication Failed."
+                });
+            }
+
             var authObj = JsonConvert.DeserializeObject<AuthObject>(authResponse.Content.ReadAsStringAsync().Result);
 
             var tokenCredentials = new TokenCredentials(authObj.access_token, "Bearer");
@@ -240,6 +258,102 @@ namespace pbiApp.Controllers
                     EmbedToken = tokenResponse,
                     EmbedUrl = dashboard.EmbedUrl,
                     Id = dashboard.Id
+                };
+
+                return View(embedConfig);
+            }
+        }
+
+        public async Task<ActionResult> EmbedTile()
+        {
+            var error = GetWebConfigErrors();
+            if (error != null)
+            {
+                return View(new TileEmbedConfig()
+                {
+                    ErrorMessage = error
+                });
+            }
+
+            // Create user credentials dictionary.
+            var content = new Dictionary<string, string>();
+            content["grant_type"] = "password";
+            content["resource"] = ResourceUrl;
+            content["username"] = Username;
+            content["password"] = Password;
+            content["client_id"] = ClientId;
+
+            var httpClient = new HttpClient
+            {
+                Timeout = new TimeSpan(0, 5, 0),
+                BaseAddress = new Uri(AuthorityUrl)
+            };
+
+            httpClient.DefaultRequestHeaders.TryAddWithoutValidation("Content-Type: application/x-www-form-urlencoded", "application/json");
+
+            if (content == null)
+            {
+                content = new Dictionary<string, string>();
+            }
+
+            var encodedContent = new FormUrlEncodedContent(content);
+
+            //Authenticate using credentials
+            var authResponse = await httpClient.PostAsync(httpClient.BaseAddress, encodedContent);
+
+            if (authResponse == null)
+            {
+                return View(new TileEmbedConfig()
+                {
+                    ErrorMessage = "Authentication Failed."
+                });
+            }
+
+            var authObj = JsonConvert.DeserializeObject<AuthObject>(authResponse.Content.ReadAsStringAsync().Result);
+
+            var tokenCredentials = new TokenCredentials(authObj.access_token, "Bearer");
+            
+            // Create a Power BI Client object. It will be used to call Power BI APIs.
+            using (var client = new PowerBIClient(new Uri(ApiUrl), tokenCredentials))
+            {
+                // Get a list of dashboards.
+                var dashboards = await client.Dashboards.GetDashboardsInGroupAsync(GroupId);
+
+                // Get the first report in the group.
+                var dashboard = dashboards.Value.FirstOrDefault();
+
+                if (dashboard == null)
+                {
+                    return View(new TileEmbedConfig()
+                    {
+                        ErrorMessage = "Group has no dashboards."
+                    });
+                }
+
+                var tiles = await client.Dashboards.GetTilesInGroupAsync(GroupId, dashboard.Id);
+
+                // Get the first tile in the group.
+                var tile = tiles.Value.FirstOrDefault();
+
+                // Generate Embed Token for a tile.
+                var generateTokenRequestParameters = new GenerateTokenRequest(accessLevel: "view");
+                var tokenResponse = await client.Tiles.GenerateTokenInGroupAsync(GroupId, dashboard.Id, tile.Id, generateTokenRequestParameters);
+
+                if (tokenResponse == null)
+                {
+                    return View(new TileEmbedConfig()
+                    {
+                        ErrorMessage = "Failed to generate embed token."
+                    });
+                }
+
+                // Generate Embed Configuration.
+                var embedConfig = new TileEmbedConfig()
+                {
+                    EmbedToken = tokenResponse,
+                    EmbedUrl = tile.EmbedUrl,
+                    Id = tile.Id,
+                    dashboardId = dashboard.Id
                 };
 
                 return View(embedConfig);
